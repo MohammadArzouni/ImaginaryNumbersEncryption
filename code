@@ -1,0 +1,201 @@
+import javax.crypto.Cipher;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
+import java.util.Random;
+import java.util.Base64;
+import java.util.Scanner;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.awt.geom.Point2D;
+import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.PBEKeySpec;
+import java.security.spec.KeySpec;
+
+
+public class Main {
+
+    private SecretKeySpec subKey1;
+    private SecretKeySpec subKey2;
+    
+    public Main(String mainKey) {
+        try {
+            // Derive subkeys from the main key
+            SecretKeyFactory keyFactory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+            KeySpec keySpec = new PBEKeySpec(mainKey.toCharArray(), new byte[16], 10000, 256);
+            SecretKey secretKey = keyFactory.generateSecret(keySpec);
+            byte[] keyBytes = secretKey.getEncoded();
+
+            byte[] subKey1Bytes = new byte[16];
+            byte[] subKey2Bytes = new byte[16];
+
+            System.arraycopy(keyBytes, 0, subKey1Bytes, 0, 16);
+            System.arraycopy(keyBytes, 16, subKey2Bytes, 0, 16);
+
+            subKey1 = new SecretKeySpec(subKey1Bytes, "AES");
+            subKey2 = new SecretKeySpec(subKey2Bytes, "AES");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    private static final Point2D.Double[] generateSBox() {
+        Point2D.Double[] sBox = new Point2D.Double[256]; // Array to hold 256 values
+
+        for (int i = 0; i < 256; i++) {
+            // Generate a custom complex number
+            double real = Math.sin(i * 0.1); // Generate a sinusoidal wave for the real component
+            double imaginary = Math.cos(i * 0.1); // Generate a sinusoidal wave for the imaginary component
+
+            Point2D.Double complexNumber = new Point2D.Double(real, imaginary);
+            sBox[i] = complexNumber; // Assign the complex number to the S-Box array
+        }
+
+        return sBox;
+    }
+
+    private static final Point2D.Double[] S_BOX = generateSBox();
+
+    private static final byte[] generatePBox() {
+        byte[] pBox = new byte[256];
+
+        // Initialize the pBox with sequential values
+        for (int i = 0; i < 256; i++) {
+            pBox[i] = (byte) i;
+        }
+
+        // Perform Fisher-Yates shuffle
+        Random random = new Random();
+        for (int i = 255; i > 0; i--) {
+            int j = random.nextInt(i + 1);
+
+            // Swap values
+            byte temp = pBox[i];
+            pBox[i] = pBox[j];
+            pBox[j] = temp;
+        }
+
+        return pBox;
+    }
+
+    private static final byte[] P_BOX = generatePBox();
+
+    // Custom substitution using S-box
+    private byte[] substitute(byte[] input, Point2D.Double[] sBox) {
+        byte[] output = new byte[input.length];
+        for (int i = 0; i < input.length; i++) {
+            int index = input[i] & 0xFF;
+            Point2D.Double complexNumber = sBox[index];
+            output[i] = (byte) complexNumber.getX();
+        }
+        return output;
+    }
+
+    // Custom permutation using P-box
+    private byte[] permute(byte[] input, byte[] pBox) {
+        byte[] output = new byte[input.length];
+        for (int i = 0; i < input.length; i++) {
+            output[i] = pBox[input[i] & 0xFF];
+        }
+        return output;
+    }
+
+    // Reverse permutation using inverse P-box
+    private byte[] reversePermute(byte[] input, byte[] inversePBox) {
+        byte[] output = new byte[input.length];
+        for (int i = 0; i < input.length; i++) {
+            output[i] = inversePBox[input[i] & 0xFF];
+        }
+        return output;
+    }
+
+    // Reverse substitution using inverse S-box
+    private byte[] reverseSubstitute(byte[] input, Point2D.Double[] inverseSBox) {
+        byte[] output = new byte[input.length];
+        for (int i = 0; i < input.length; i++) {
+            byte value = input[i];
+            for (int j = 0; j < inverseSBox.length; j++) {
+                Point2D.Double complexNumber = inverseSBox[j];
+                if ((byte) complexNumber.getX() == value) {
+                    output[i] = (byte) j;
+                    break;
+                }
+            }
+        }
+        return output;
+    }
+
+  
+    // Custom symmetric encryption algorithm
+    public String encrypt(String message) {
+        try {
+            Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+
+            // Encryption using subKey1 for substitution
+            cipher.init(Cipher.ENCRYPT_MODE, subKey1);
+            byte[] encryptedBytes = cipher.doFinal(message.getBytes(StandardCharsets.UTF_8));
+
+            encryptedBytes = substitute(encryptedBytes, S_BOX);
+
+            // Encryption using subKey2 for permutation
+            cipher.init(Cipher.ENCRYPT_MODE, subKey2);
+            encryptedBytes = cipher.doFinal(encryptedBytes);
+
+            return Base64.getEncoder().encodeToString(encryptedBytes);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    // Custom symmetric decryption algorithm
+    public String decrypt(String encryptedMessage) {
+        try {
+            Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+
+            // Base64 decoding
+            byte[] encryptedBytes = Base64.getDecoder().decode(encryptedMessage);
+
+            // Decryption using subKey2 for permutation
+            cipher.init(Cipher.DECRYPT_MODE, subKey2);
+            byte[] decryptedBytes = cipher.doFinal(encryptedBytes);
+
+            // Reverse substitution using subKey1
+            decryptedBytes = reverseSubstitute(decryptedBytes, S_BOX);
+
+            return new String(decryptedBytes, StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        String key;
+        while (true) {
+            System.out.print("Enter the main key (16 characters): ");
+            key = scanner.nextLine();
+
+            if (key.length() != 16) {
+                System.out.println("Invalid key length. The main key must be 16 characters long.\n");
+            } else {
+                break;
+            }
+        }
+
+        Main encryption = new Main(key);
+
+        System.out.print("Enter the message to encrypt: ");
+        String message = scanner.nextLine();
+
+        String encryptedMessage = encryption.encrypt(message);
+        System.out.println("Encrypted message: " + encryptedMessage);
+
+        String decryptedMessage = encryption.decrypt(encryptedMessage);
+        System.out.println("Decrypted message: " + decryptedMessage);
+    }
+}
