@@ -1,0 +1,16 @@
+private static final Point2D.Double[] generateSBox() {
+        Point2D.Double[] sBox = new Point2D.Double[256]; // Array to hold 256 values
+
+        for (int i = 0; i < 256; i++) {
+            // Generate a custom complex number
+            double real = Math.sin(i * 0.1); // Generate a sinusoidal wave for the real component
+            double imaginary = Math.cos(i * 0.1); // Generate a sinusoidal wave for the imaginary component
+
+            Point2D.Double complexNumber = new Point2D.Double(real, imaginary);
+            sBox[i] = complexNumber; // Assign the complex number to the S-Box array
+        }
+
+        return sBox;
+    }
+
+    private static final Point2D.Double[] S_BOX = generateSBox();
