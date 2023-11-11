@@ -1,0 +1,23 @@
+private static final byte[] generatePBox() {
+        byte[] pBox = new byte[256];
+
+        // Initialize the pBox with sequential values
+        for (int i = 0; i < 256; i++) {
+            pBox[i] = (byte) i;
+        }
+
+        // Perform Fisher-Yates shuffle
+        Random random = new Random();
+        for (int i = 255; i > 0; i--) {
+            int j = random.nextInt(i + 1);
+
+            // Swap values
+            byte temp = pBox[i];
+            pBox[i] = pBox[j];
+            pBox[j] = temp;
+        }
+
+        return pBox;
+    }
+
+    private static final byte[] P_BOX = generatePBox();
