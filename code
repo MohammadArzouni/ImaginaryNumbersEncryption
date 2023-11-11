@@ -132,7 +132,7 @@ public class Main {
     // Custom symmetric encryption algorithm
     public String encrypt(String message) {
         try {
-            Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 
             // Encryption using subKey1 for substitution
             cipher.init(Cipher.ENCRYPT_MODE, subKey1);
@@ -154,7 +154,7 @@ public class Main {
     // Custom symmetric decryption algorithm
     public String decrypt(String encryptedMessage) {
         try {
-            Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 
             // Base64 decoding
             byte[] encryptedBytes = Base64.getDecoder().decode(encryptedMessage);
